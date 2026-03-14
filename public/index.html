@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PocketDay | Survival Budgeting</title>
+    
+    <!-- PWA & Mobile Meta Tags -->
+    <meta name="description" content="Minimal daily expense tracker for survival budgeting.">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0A0A0A">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+
+    <!-- CSS & Fonts -->
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'pd-black': '#0A0A0A',
+                        'pd-green': '#00FF41',
+                        'pd-yellow': '#FFFB3D',
+                        'pd-red': '#FF4136',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-subtle': 'bounce 2s infinite',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-pd-black text-white font-sans min-h-screen flex flex-col items-center">
+    
+    <!-- Offline Indicator -->
+    <div id="offline-status" class="hidden fixed top-0 left-0 w-full bg-pd-red text-pd-black text-xs font-bold py-1 text-center z-50 animate-pulse">
+        OFFLINE MODE • DATA WILL SYNC LATER
+    </div>
+
+    <div id="app" class="w-full max-w-[420px] flex flex-col gap-6 p-4 pb-24 relative min-h-screen">
+        
+        <!-- Header Section -->
+        <header class="flex flex-col items-center gap-2 py-6 relative">
+            <div id="login-container" class="absolute top-4 left-0">
+                <button id="btn-login" class="bg-white/10 hover:bg-pd-green hover:text-pd-black text-[10px] font-bold px-4 py-2 rounded-full active:scale-95 transition-all uppercase tracking-widest border border-white/5">
+                    Sign In
+                </button>
+            </div>
+            
+            <div id="user-profile" class="hidden absolute top-4 left-0 flex items-center gap-3">
+                <img id="user-avatar" src="" class="w-8 h-8 rounded-full border border-pd-green" />
+                <div class="flex flex-col">
+                    <span id="user-name" class="text-[10px] font-bold opacity-80 truncate max-w-[80px]">User</span>
+                    <button id="btn-logout" class="text-[8px] font-bold uppercase opacity-40 hover:opacity-100 transition-opacity text-left">Logout</button>
+                </div>
+            </div>
+
+            <button id="install-app" class="hidden absolute top-4 right-0 bg-pd-green text-pd-black text-[10px] font-bold px-3 py-1 rounded-full active:scale-95 transition-transform uppercase tracking-tighter">
+                Install App
+            </button>
+            <span class="text-xs font-semibold opacity-40 tracking-widest uppercase">Safe Spend Today</span>
+            <div id="safe-spend" class="text-6xl font-mono font-bold text-pd-green transition-all duration-500">₹0</div>
+            
+            <!-- Spending Progress Bar -->
+            <div class="w-full mt-4 bg-white/5 h-1.5 rounded-full overflow-hidden border border-white/5">
+                <div id="spend-progress" class="bg-pd-green h-full w-0 transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(0,255,65,0.5)]"></div>
+            </div>
+
+            <div id="survival-status" class="mt-4 text-[11px] font-bold opacity-80 bg-white/5 px-4 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-pd-green animate-pulse"></span>
+                SURVIVAL: <span id="days-remaining" class="font-mono">0</span> DAYS
+            </div>
+        </header>
+
+        <main class="flex flex-col gap-6">
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-2 gap-3" id="stats-container">
+                <div class="bg-white/5 p-4 rounded-2xl border border-white/10 hover:border-white/20 transition-colors">
+                    <span class="block text-[10px] font-bold opacity-40 mb-1 uppercase tracking-tight">Total Balance</span>
+                    <span id="total-balance" class="text-xl font-mono font-bold">₹0</span>
+                </div>
+                <div class="bg-white/5 p-4 rounded-2xl border border-white/10 hover:border-white/20 transition-colors">
+                    <span class="block text-[10px] font-bold opacity-40 mb-1 uppercase tracking-tight">Today Spent</span>
+                    <span id="today-spent" class="text-xl font-mono font-bold">₹0</span>
+                </div>
+            </div>
+
+            <!-- Quick Actions Section -->
+            <section>
+                <div class="flex justify-between items-center mb-3 px-1">
+                    <h3 class="text-[10px] font-bold opacity-40 uppercase tracking-widest">Quick Log</h3>
+                </div>
+                <div class="grid grid-cols-2 gap-2" id="quick-actions">
+                    <button data-category="Food" data-amount="10" class="bg-white/5 hover:bg-pd-green hover:text-pd-black active:scale-95 transition-all p-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm border border-white/5">
+                        <span class="text-lg">☕</span> Tea
+                    </button>
+                    <button data-category="Food" data-amount="30" class="bg-white/5 hover:bg-pd-green hover:text-pd-black active:scale-95 transition-all p-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm border border-white/5">
+                        <span class="text-lg">🍪</span> Snack
+                    </button>
+                    <button data-category="Transport" data-amount="15" class="bg-white/5 hover:bg-pd-green hover:text-pd-black active:scale-95 transition-all p-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm border border-white/5">
+                        <span class="text-lg">🚌</span> Bus
+                    </button>
+                    <button id="btn-custom" class="bg-white/10 hover:bg-white hover:text-pd-black active:scale-95 transition-all p-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm border border-white/10">
+                        <span class="text-lg">➕</span> Custom
+                    </button>
+                </div>
+            </section>
+
+            <!-- Daily Activity Section -->
+            <section class="flex-grow">
+                <h3 class="text-[10px] font-bold opacity-40 mb-3 px-1 uppercase tracking-widest">Today's Activity</h3>
+                <div id="expense-list" class="flex flex-col gap-2">
+                    <!-- Empty State injection -->
+                    <div class="text-center py-12 opacity-20 italic text-sm border border-dashed border-white/10 rounded-2xl">
+                        No expenses logged yet.
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Floating Action Button -->
+        <button id="fab-add-expense" class="fixed bottom-8 right-6 w-14 h-14 bg-pd-green text-pd-black rounded-full shadow-[0_8px_24px_rgba(0,255,65,0.3)] flex items-center justify-center text-3xl font-bold active:scale-90 transition-transform z-40 hover:rotate-90">
+            +
+        </button>
+
+        <!-- Broke Mode Warning Card -->
+        <footer id="footer-warning" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-[380px] bg-pd-red text-pd-black p-4 rounded-2xl shadow-2xl z-50 animate-bounce-subtle">
+            <div class="flex items-center justify-center gap-3">
+                <span class="text-xl">⚠</span>
+                <p class="font-black text-xs uppercase tracking-tighter">Broke Mode Active • Stop Spending Immediately</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="scripts/app.js" type="module"></script>
+    <script>
+        // Internet Connection Monitoring
+        const updateOnlineStatus = () => {
+            document.getElementById('offline-status').classList.toggle('hidden', navigator.onLine);
+        };
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        updateOnlineStatus();
+
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(reg => console.log('SW Registered', reg))
+                    .catch(err => console.log('SW Register Error', err));
+            });
+        }
+    </script>
+</body>
+</html>
