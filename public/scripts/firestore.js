@@ -14,15 +14,16 @@ import {
     limit
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-export const saveUserToCloud = async (userId, userData) => {
-    await setDoc(doc(db, "users", userId), {
+export const saveUserToCloud = async (uid, userData) => {
+    await setDoc(doc(db, "users", uid), {
         ...userData,
+        uid: uid,
         updatedAt: serverTimestamp()
     }, { merge: true });
 };
 
-export const fetchUserFromCloud = async (userId) => {
-    const docSnap = await getDoc(doc(db, "users", userId));
+export const fetchUserFromCloud = async (uid) => {
+    const docSnap = await getDoc(doc(db, "users", uid));
     return docSnap.exists() ? docSnap.data() : null;
 };
 
@@ -32,21 +33,21 @@ const getTodayStr = () => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-// Add expense logic based on user request
-export const addExpenseToFirestore = async (userId, expense) => {
+// Add expense logic based on user request - Ensuring 'uid' is included
+export const addExpenseToFirestore = async (uid, expense) => {
     return await addDoc(collection(db, "expenses"), {
-        userId: userId,
+        uid: uid,
         category: expense.category,
         amount: expense.amount,
         date: getTodayStr(), // consistency with app.js
-        timestamp: Date.now()
+        timestamp: serverTimestamp() // Using server side timestamp
     });
 };
 
-export const fetchExpensesFromFirestore = async (userId) => {
+export const fetchExpensesFromFirestore = async (uid) => {
     const q = query(
         collection(db, "expenses"), 
-        where("userId", "==", userId),
+        where("uid", "==", uid),
         orderBy("id", "desc"),
         limit(50) // Performance: only show recent 50
     );
