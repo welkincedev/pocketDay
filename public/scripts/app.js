@@ -69,14 +69,9 @@ const calculateTodaySpent = (expenses) => {
 const calculateStats = () => {
     const todaySpent = calculateTodaySpent(state.expenses);
     const daysLeft = getDaysRemaining();
-
-    // Total money available at the start of today (including what was spent today)
-    const startingBalanceToday = state.balance + todaySpent;
     
-    // The fixed daily share for all remaining days
-    const dailyBudget = daysLeft > 0 ? startingBalanceToday / daysLeft : startingBalanceToday;
-    
-    // How much of today's share is left
+    // As per user request: (Balance / DaysLeft) - TodaySpent
+    const dailyBudget = daysLeft > 0 ? state.balance / daysLeft : state.balance;
     const safeSpendToday = dailyBudget - todaySpent;
 
     // Survival Days: How long you'd last at your AVERAGE spending rate
@@ -106,6 +101,9 @@ const updateDashboard = () => {
     document.getElementById('days-remaining').textContent = Math.round(survivalDays);
     document.getElementById('total-balance').textContent = formatCurrency(state.balance);
     document.getElementById('today-spent').textContent = formatCurrency(todaySpent);
+    
+    const quotaEl = document.getElementById('daily-quota');
+    if (quotaEl) quotaEl.textContent = formatCurrency(dailyBudget);
 
     // Progress Bar
     const progressEl = document.getElementById('spend-progress');
