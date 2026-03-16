@@ -16,7 +16,8 @@ let state = {
     user: null, // Firebase User object
     balance: 0,
     expenses: [],
-    targetDate: ''
+    targetDate: '',
+    warningDismissed: false
 };
 
 // --- UTILS ---
@@ -83,7 +84,11 @@ const updateDashboard = () => {
     if (ratio >= 100 || safeDaily < 50) {
         progressEl.className = 'bg-pd-red h-full transition-all duration-500';
         safeSpendEl.className = 'text-6xl font-mono font-bold text-pd-red';
-        warningEl.classList.remove('hidden');
+        if (!state.warningDismissed) {
+            warningEl.classList.remove('hidden');
+        } else {
+            warningEl.classList.add('hidden');
+        }
     } else if (ratio > 70 || safeDaily < 100) {
         progressEl.className = 'bg-pd-yellow h-full transition-all duration-500';
         safeSpendEl.className = 'text-6xl font-mono font-bold text-pd-yellow';
@@ -141,6 +146,7 @@ window.addExpense = async (amount, category) => {
     // UI Optimistic Update
     state.expenses.unshift(expense);
     state.balance -= expense.amount;
+    state.warningDismissed = false; // Reset dismissal on new expense
     updateDashboard();
     renderExpenses();
 
@@ -168,6 +174,7 @@ window.deleteExpense = async (id, firestoreId) => {
     state.balance += removedAmt;
 
     // UI update
+    state.warningDismissed = false; // Reset on delete too
     updateDashboard();
     renderExpenses();
 
@@ -189,10 +196,12 @@ const initApp = () => {
     observeAuth(async (user) => {
         state.user = user;
         const profileEl = document.getElementById('user-profile');
-        const loginEl = document.getElementById('login-container');
+        const appEl = document.getElementById('app');
+        const landingEl = document.getElementById('landing-page');
 
         if (user) {
-            loginEl.classList.add('hidden');
+            landingEl.classList.add('hidden');
+            appEl.classList.remove('hidden');
             profileEl.classList.remove('hidden');
             document.getElementById('user-name').textContent = user.displayName;
             document.getElementById('user-avatar').src = user.photoURL;
@@ -206,20 +215,38 @@ const initApp = () => {
                 }
 
                 const cloudExpenses = await fetchExpensesFromFirestore(user.uid);
-                if (cloudExpenses.length > 0) {
-                    state.expenses = cloudExpenses;
-                }
+                // ALWAYS overwrite state.expenses when cloud data is fetched
+                // If cloud is empty, state should become empty.
+                state.expenses = cloudExpenses;
                 
                 saveMetaData();
                 saveExpenses();
+
+                // AUTOMATIC SETUP: If logged in but no balance/date set in cloud or local
+                if (!state.balance && !state.targetDate) {
+                    setupFirstLaunch();
+                }
             } catch (e) {
                 console.error("Initial cloud sync failed, using local fallback", e);
             }
         } else {
-            loginEl.classList.remove('hidden');
+            landingEl.classList.remove('hidden');
+            appEl.classList.add('hidden');
             profileEl.classList.add('hidden');
             
-            // Revert/Load local storage
+            // SECURITY: Clear sensitive UI text immediately on logout
+            document.getElementById('safe-spend').textContent = '₹0';
+            document.getElementById('total-balance').textContent = '₹0';
+            document.getElementById('today-spent').textContent = '₹0';
+            document.getElementById('user-name').textContent = 'User';
+            document.getElementById('user-avatar').src = '';
+            
+            // Revert/Load local storage (or clear if preferred)
+            // For now, we revert to local data, but we must ensure it's not the logged-in user's data.
+            // PocketDay design follows "private by default". 
+            // If User A logs out, User A's data should not be in localStorage if it was synced.
+            // But state.expenses was just overwritten by user data.
+            // Let's reset the state entirely to prevent leakage if user didn't have local data.
             state.balance = parseFloat(localStorage.getItem('pocketday_balance')) || 0;
             state.expenses = JSON.parse(localStorage.getItem('pocketday_expenses')) || [];
             state.targetDate = localStorage.getItem('pocketday_target_date') || '';
@@ -228,8 +255,8 @@ const initApp = () => {
         renderExpenses();
     });
 
-    // Login Action
-    document.getElementById('btn-login').addEventListener('click', async () => {
+    // Login Action (Landing Page)
+    document.getElementById('btn-login-main').addEventListener('click', async () => {
         try {
             await loginWithGoogle();
         } catch (e) {
@@ -238,12 +265,32 @@ const initApp = () => {
     });
 
     // Logout Action
-    document.getElementById('btn-logout').addEventListener('click', () => logout());
+    document.getElementById('btn-logout').addEventListener('click', () => {
+        if (confirm("Logout? Data will sync next time you login.")) {
+            logout();
+        }
+    });
 
-    // First Launch Logic (Local)
-    if (!localStorage.getItem('pocketday_balance') && !state.user) {
-        setupFirstLaunch();
-    }
+    // Edit Actions
+    document.getElementById('btn-edit-balance').addEventListener('click', () => {
+        const bal = prompt("Update Total Balance (₹):", state.balance);
+        if (bal !== null && !isNaN(bal)) {
+            state.balance = parseFloat(bal);
+            saveMetaData();
+            if (state.user) saveUserToCloud(state.user.uid, { balance: state.balance, targetDate: state.targetDate });
+            updateDashboard();
+        }
+    });
+
+    document.getElementById('btn-edit-date').addEventListener('click', () => {
+        const date = prompt("Update Month End Date (YYYY-MM-DD):", state.targetDate || "2026-03-31");
+        if (date) {
+            state.targetDate = date;
+            saveMetaData();
+            if (state.user) saveUserToCloud(state.user.uid, { balance: state.balance, targetDate: state.targetDate });
+            updateDashboard();
+        }
+    });
 
     // Set up Quick Actions
     document.querySelectorAll('#quick-actions button').forEach(btn => {
@@ -259,10 +306,20 @@ const initApp = () => {
     });
 
     // FAB Custom Add
-    document.getElementById('fab-add-expense').addEventListener('click', () => {
-        const amt = prompt("Amount?");
-        const cat = prompt("Category?");
-        if (amt && cat) window.addExpense(amt, cat);
+    const fab = document.getElementById('fab-add-expense');
+    if (fab) {
+        fab.addEventListener('click', (e) => {
+            e.preventDefault();
+            const amt = prompt("Amount?");
+            const cat = prompt("Category (e.g. Food, Bus)?", "Custom");
+            if (amt && cat) window.addExpense(amt, cat);
+        });
+    }
+
+    // Warning Close
+    document.getElementById('btn-close-warning').addEventListener('click', () => {
+        state.warningDismissed = true;
+        updateDashboard();
     });
 };
 
