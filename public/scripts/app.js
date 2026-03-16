@@ -43,17 +43,6 @@ const CATEGORIES = [
     { name: 'Other', emoji: '💸' }
 ];
 
-const SURVIVAL_MESSAGES = [
-    "Today we survive on water.",
-    "Maggi is your financial advisor tonight.",
-    "Cancel Swiggy. Cook noodles.",
-    "Sleep early to save money.",
-    "Hostel mess is your best friend now.",
-    "Forget the Chai, drink only air.",
-    "Walking is the only transportation.",
-    "Window shopping is free. Stay there."
-];
-
 // --- UTILS ---
 const getTodayStr = () => {
     const d = new Date();
@@ -184,36 +173,22 @@ const updateDashboard = () => {
 
     // Status Footer Warning Logic
     const warningEl = document.getElementById('footer-warning');
-    const brokeMsgEl = document.getElementById('broke-message');
 
     if (safeSpendToday < 0 || dailyBudget < 50) {
-        if (!state.warningDismissed) {
+        if (!state.warningDismissed && warningEl) {
             warningEl.classList.remove('hidden');
             
             // Update Title with overspent amount
             const overspentAmt = Math.abs(Math.round(safeSpendToday));
             const titleEl = warningEl.querySelector('p.font-black');
             if (titleEl) {
-                titleEl.textContent = safeSpendToday < 0 ? `Broke Mode Active • Overspent ₹${overspentAmt}` : `Broke Mode Active`;
+                titleEl.textContent = safeSpendToday < 0 ? `Overspent by ${formatCurrency(overspentAmt)}` : `Low Daily Quota`;
             }
-
-            // Randomize message if just shown
-            if (brokeMsgEl && brokeMsgEl.textContent === "") {
-                const msg = SURVIVAL_MESSAGES[Math.floor(Math.random() * SURVIVAL_MESSAGES.length)];
-                brokeMsgEl.textContent = msg;
-            }
-        } else {
+        } else if (warningEl) {
             warningEl.classList.add('hidden');
         }
-        
-        // Broke Mode Accent triggers
-        if (safeSpendToday < 0) {
-            document.body.classList.add('border-t-2', 'border-pd-red');
-        }
     } else {
-        warningEl.classList.add('hidden');
-        if (brokeMsgEl) brokeMsgEl.textContent = ""; // Reset for next time
-        document.body.classList.remove('border-t-2', 'border-pd-red');
+        if (warningEl) warningEl.classList.add('hidden');
     }
 
     // --- WEEKLY HEATMAP ---
@@ -581,14 +556,13 @@ const initApp = () => {
         }
     });
 
-    // Set up Quick Actions
-    document.querySelectorAll('#quick-actions button').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const cat = btn.dataset.category || btn.textContent.trim().split(' ').pop();
-            const amt = btn.dataset.amount || '';
-            openExpenseModal(amt, cat);
+    // Set up Quick Action (Custom)
+    const customBtn = document.getElementById('btn-custom');
+    if (customBtn) {
+        customBtn.addEventListener('click', () => {
+            openExpenseModal();
         });
-    });
+    }
 
     // FAB Custom Add
     const fab = document.getElementById('fab-add-expense');

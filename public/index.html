@@ -38,17 +38,9 @@
                         sans: ['Inter', 'sans-serif'],
                         mono: ['JetBrains Mono', 'monospace'],
                     },
-                    keyframes: {
-                        shake: {
-                            '0%, 100%': { transform: 'translateX(-50%)' },
-                            '10%, 30%, 50%, 70%, 90%': { transform: 'translateX(-52%)' },
-                            '20%, 40%, 60%, 80%': { transform: 'translateX(-48%)' },
-                        }
-                    },
                     animation: {
                         'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                         'bounce-subtle': 'bounce 2s infinite',
-                        'shake': 'shake 0.5s cubic-bezier(.36,.07,.19,.97) both infinite',
                     }
                 }
             }
@@ -193,26 +185,11 @@
                 </div>
             </section>
 
-            <section>
-                <div class="flex justify-between items-center mb-3 px-1">
-                    <h3 class="text-[10px] font-bold opacity-40 uppercase tracking-widest">Quick Log</h3>
-                </div>
-                <div class="grid grid-cols-2 gap-2" id="quick-actions">
-                    <button data-category="Food" data-amount="10"
-                        class="bg-white/5 hover:bg-pd-green hover:text-pd-black active:scale-95 transition-all p-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm border border-white/5">
-                        <span class="text-lg">☕</span> Tea
-                    </button>
-                    <button data-category="Food" data-amount="30"
-                        class="bg-white/5 hover:bg-pd-green hover:text-pd-black active:scale-95 transition-all p-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm border border-white/5">
-                        <span class="text-lg">🍪</span> Snack
-                    </button>
-                    <button data-category="Transport" data-amount="15"
-                        class="bg-white/5 hover:bg-pd-green hover:text-pd-black active:scale-95 transition-all p-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm border border-white/5">
-                        <span class="text-lg">🚌</span> Bus
-                    </button>
+            <section class="mb-6">
+                <div class="flex flex-col gap-2" id="quick-actions">
                     <button id="btn-custom"
-                        class="bg-white/10 hover:bg-white hover:text-pd-black active:scale-95 transition-all p-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm border border-white/10">
-                        <span class="text-lg">➕</span> Custom
+                        class="bg-white/5 hover:bg-pd-green hover:text-pd-black active:scale-95 transition-all p-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm border border-white/5">
+                        <span class="text-lg">➕</span> Add Custom Expense
                     </button>
                 </div>
             </section>
@@ -266,16 +243,13 @@
             +
         </button>
 
-        <!-- Broke Mode Warning Card -->
+        <!-- Budget Warning Card -->
         <footer id="footer-warning"
-            class="hidden fixed bottom-24 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-[380px] bg-pd-red/90 backdrop-blur-md text-pd-black p-4 rounded-2xl shadow-[0_20px_50px_rgba(255,65,54,0.3)] z-50 animate-shake border border-white/20">
+            class="hidden fixed bottom-24 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-[380px] bg-pd-red/90 backdrop-blur-md text-pd-black p-4 rounded-2xl shadow-[0_20px_50px_rgba(255,65,54,0.3)] z-50 border border-white/20">
             <div class="flex items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
-                    <span class="text-2xl shrink-0">💀</span>
-                    <div class="flex flex-col">
-                        <p class="font-black text-[11px] leading-tight uppercase tracking-widest">Broke Mode Active</p>
-                        <p id="broke-message" class="text-[9px] font-bold opacity-80 mt-0.5 italic">Today we survive on water.</p>
-                    </div>
+                    <span class="text-xl shrink-0">⚠</span>
+                    <p class="font-black text-[11px] leading-tight uppercase tracking-widest">Budget Alert Active</p>
                 </div>
                 <button id="btn-close-warning" class="p-2 hover:bg-black/10 rounded-xl transition-colors shrink-0">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

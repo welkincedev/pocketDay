@@ -50,14 +50,16 @@ export const fetchExpensesFromFirestore = async (uid) => {
     const q = query(
         collection(db, "expenses"), 
         where("uid", "==", uid),
-        orderBy("id", "desc"), // Order by our internal timestamp ID
         limit(100)
     );
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ 
+    const expenses = querySnapshot.docs.map(doc => ({ 
         firestoreId: doc.id, 
         ...doc.data() 
     }));
+    
+    // Sort by 'id' (our timestamp) descending in JS to avoid composite index requirement
+    return expenses.sort((a, b) => b.id - a.id);
 };
 
 export const deleteExpenseFromFirestore = async (expenseDocId) => {
