@@ -218,9 +218,15 @@
             </section>
 
             <!-- Daily Activity Section -->
-            <section class="flex-grow">
-                <div class="flex justify-between items-end mb-4 px-1">
+            <section>
+                <div class="flex justify-between items-center mb-4 px-1">
                     <h3 class="text-[10px] font-bold opacity-40 uppercase tracking-widest">Today's Activity</h3>
+                    <a href="analytics.html" class="text-[9px] font-black text-pd-green uppercase tracking-widest hover:opacity-100 opacity-60 transition-all flex items-center gap-1">
+                        Full Analytics 
+                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </a>
                 </div>
 
                 <!-- Activity Analytics Summary -->
@@ -282,15 +288,15 @@
     </div>
 
     <!-- Navigation Bar -->
-    <nav class="fixed bottom-0 left-0 w-full flex justify-center p-6 z-[60] pointer-events-none">
+    <nav id="main-nav" class="hidden fixed bottom-0 left-0 w-full flex justify-center p-6 z-[60] pointer-events-none">
         <div
-            class="bg-pd-black/80 backdrop-blur-xl border border-white/10 p-2 rounded-full flex gap-2 pointer-events-auto shadow-2xl">
-            <a href="index.html" class="p-4 rounded-full bg-pd-green text-pd-black shadow-lg shadow-pd-green/20">
+            class="bg-pd-black/80 backdrop-blur-xl border border-white/10 p-2 rounded-full flex gap-2 pointer-events-auto shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+            <a href="index.html" class="p-4 rounded-full bg-pd-green text-pd-black shadow-lg shadow-pd-green/20 active:scale-90 transition-transform">
                 <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
                 </svg>
             </a>
-            <a href="analytics.html" class="p-4 rounded-full opacity-40 hover:opacity-100 transition-all">
+            <a href="analytics.html" class="p-4 rounded-full opacity-40 hover:opacity-100 transition-all active:scale-90">
                 <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.09-4-4L2 17.08z" />
                 </svg>

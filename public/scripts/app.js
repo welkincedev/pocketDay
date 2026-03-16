@@ -143,9 +143,13 @@ const updateDashboard = () => {
     }
 
     // Dynamic Stats
-    document.getElementById('days-remaining').textContent = Math.round(survivalDays);
-    document.getElementById('total-balance').textContent = formatCurrency(state.balance);
-    document.getElementById('today-spent').textContent = formatCurrency(todaySpent);
+    const daysRemainingEl = document.getElementById('days-remaining');
+    const totalBalanceEl = document.getElementById('total-balance');
+    const todaySpentEl = document.getElementById('today-spent');
+
+    if (daysRemainingEl) daysRemainingEl.textContent = Math.round(survivalDays);
+    if (totalBalanceEl) totalBalanceEl.textContent = formatCurrency(state.balance);
+    if (todaySpentEl) todaySpentEl.textContent = formatCurrency(todaySpent);
 
     // Activity Analytics Summary
     const statCountEl = document.getElementById('stat-count');
@@ -464,13 +468,18 @@ const initApp = () => {
         const profileEl = document.getElementById('user-profile');
         const appEl = document.getElementById('app');
         const landingEl = document.getElementById('landing-page');
+        const navEl = document.getElementById('main-nav');
 
         if (user) {
-            landingEl.classList.add('hidden');
-            appEl.classList.remove('hidden');
-            profileEl.classList.remove('hidden');
-            document.getElementById('user-name').textContent = user.displayName;
-            document.getElementById('user-avatar').src = user.photoURL;
+            landingEl?.classList.add('hidden');
+            appEl?.classList.remove('hidden');
+            profileEl?.classList.remove('hidden');
+            navEl?.classList.remove('hidden');
+            
+            const nameEl = document.getElementById('user-name');
+            const avatarEl = document.getElementById('user-avatar');
+            if (nameEl) nameEl.textContent = user.displayName;
+            if (avatarEl) avatarEl.src = user.photoURL;
 
             try {
                 // Sync from Cloud - Priority
@@ -503,16 +512,23 @@ const initApp = () => {
             renderExpenses();
         } else {
             state.user = null;
-            landingEl.classList.remove('hidden');
-            appEl.classList.add('hidden');
-            profileEl.classList.add('hidden');
+            landingEl?.classList.remove('hidden');
+            appEl?.classList.add('hidden');
+            profileEl?.classList.add('hidden');
+            navEl?.classList.add('hidden');
             
             // SECURITY: Clear sensitive UI text immediately on logout
-            document.getElementById('safe-spend').textContent = '₹0';
-            document.getElementById('total-balance').textContent = '₹0';
-            document.getElementById('today-spent').textContent = '₹0';
-            document.getElementById('user-name').textContent = 'User';
-            document.getElementById('user-avatar').src = '';
+            const safeSpendEl = document.getElementById('safe-spend');
+            const balanceEl = document.getElementById('total-balance');
+            const spentEl = document.getElementById('today-spent');
+            const nameEl = document.getElementById('user-name');
+            const avatarEl = document.getElementById('user-avatar');
+
+            if (safeSpendEl) safeSpendEl.textContent = '₹0';
+            if (balanceEl) balanceEl.textContent = '₹0';
+            if (spentEl) spentEl.textContent = '₹0';
+            if (nameEl) nameEl.textContent = 'User';
+            if (avatarEl) avatarEl.src = '';
             
             // Revert/Load local storage (or clear if preferred)
             // For now, we revert to local data, but we must ensure it's not the logged-in user's data.
@@ -599,10 +615,13 @@ const initApp = () => {
     });
 
     // Warning Close
-    document.getElementById('btn-close-warning').addEventListener('click', () => {
-        state.warningDismissed = true;
-        updateDashboard();
-    });
+    const closeWarningBtn = document.getElementById('btn-close-warning');
+    if (closeWarningBtn) {
+        closeWarningBtn.addEventListener('click', () => {
+            state.warningDismissed = true;
+            updateDashboard();
+        });
+    }
 };
 
 const setupFirstLaunch = () => {
