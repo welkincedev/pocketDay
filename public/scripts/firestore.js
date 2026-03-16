@@ -38,6 +38,7 @@ export const addExpenseToFirestore = async (uid, expense) => {
     return await addDoc(collection(db, "expenses"), {
         uid: uid,
         category: expense.category,
+        title: expense.title || '',
         amount: expense.amount,
         date: getTodayStr(), // consistency with app.js
         timestamp: serverTimestamp() // Using server side timestamp
@@ -57,4 +58,17 @@ export const fetchExpensesFromFirestore = async (uid) => {
 
 export const deleteExpenseFromFirestore = async (expenseDocId) => {
     await deleteDoc(doc(db, "expenses", expenseDocId));
+};
+
+// Achievement Persistence
+export const saveAchievements = async (uid, achievements) => {
+    return await setDoc(doc(db, "users", uid, "data", "achievements"), {
+        list: achievements,
+        updatedAt: serverTimestamp()
+    });
+};
+
+export const loadAchievements = async (uid) => {
+    const snap = await getDoc(doc(db, "users", uid, "data", "achievements"));
+    return snap.exists() ? snap.data().list : [];
 };

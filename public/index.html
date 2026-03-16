@@ -97,12 +97,17 @@
             <button id="install-app" class="hidden absolute top-4 right-0 bg-pd-green text-pd-black text-[10px] font-bold px-3 py-1 rounded-full active:scale-95 transition-transform uppercase tracking-tighter">
                 Install App
             </button>
-            <span id="safe-spend-label" class="text-xs font-semibold opacity-40 tracking-widest uppercase text-center transition-all">Safe Spend Today</span>
+            <span id="safe-spend-label" class="text-[10px] font-black opacity-40 tracking-[0.3em] uppercase text-center transition-all mb-1">Safe Spend Today</span>
             <div id="safe-spend" class="text-6xl font-mono font-bold text-pd-green transition-all duration-500">₹0</div>
             
-            <!-- Daily Quota Info -->
-            <div class="text-[10px] font-bold opacity-30 mt-1 uppercase tracking-widest">
-                Daily Quota: <span id="daily-quota" class="font-mono">₹0</span>
+            <!-- Daily Budget Info -->
+            <div class="text-[10px] font-black opacity-30 mt-2 uppercase tracking-[0.2em] flex items-center gap-2">
+                Daily Budget <span id="daily-budget" class="font-mono text-white/60">₹0</span>
+            </div>
+
+            <!-- No-Spend Streak -->
+            <div id="streak-container" class="hidden mt-2 bg-pd-green/10 border border-pd-green/20 px-3 py-1 rounded-full animate-pulse-slow">
+                <span id="streak-count" class="text-[10px] font-black text-pd-green uppercase tracking-widest">🔥 0 Day No Spend Streak</span>
             </div>
             
             <!-- Spending Progress Bar -->
@@ -162,7 +167,31 @@
 
             <!-- Daily Activity Section -->
             <section class="flex-grow">
-                <h3 class="text-[10px] font-bold opacity-40 mb-3 px-1 uppercase tracking-widest">Today's Activity</h3>
+                <div class="flex justify-between items-end mb-4 px-1">
+                    <h3 class="text-[10px] font-bold opacity-40 uppercase tracking-widest">Today's Activity</h3>
+                </div>
+
+                <!-- Activity Analytics Summary -->
+                <div id="activity-analytics" class="grid grid-cols-3 gap-2 mb-4">
+                    <div class="bg-white/5 border border-white/5 p-3 rounded-2xl text-center">
+                        <span class="block text-[8px] font-black opacity-30 uppercase mb-1">Count</span>
+                        <span id="stat-count" class="text-sm font-mono font-bold text-pd-green">0</span>
+                    </div>
+                    <div class="bg-white/5 border border-white/5 p-3 rounded-2xl text-center">
+                        <span class="block text-[8px] font-black opacity-30 uppercase mb-1">Spent</span>
+                        <span id="stat-spent" class="text-sm font-mono font-bold text-pd-red">₹0</span>
+                    </div>
+                    <div class="bg-white/5 border border-white/5 p-3 rounded-2xl text-center">
+                        <span class="block text-[8px] font-black opacity-30 uppercase mb-1">Biggest</span>
+                        <span id="stat-biggest" class="text-sm font-mono font-bold text-pd-yellow">₹0</span>
+                    </div>
+                </div>
+
+                <!-- Badges Marquee -->
+                <div id="badges-container" class="hidden flex gap-2 overflow-x-auto pb-4 px-1 no-scrollbar">
+                    <!-- Badges will be injected here -->
+                </div>
+
                 <div id="expense-list" class="flex flex-col gap-2">
                     <!-- Empty State injection -->
                     <div class="text-center py-12 opacity-20 italic text-sm border border-dashed border-white/10 rounded-2xl">
@@ -192,7 +221,7 @@
     </div>
 
     <!-- Navigation Bar -->
-    <nav class="fixed bottom-0 left-0 w-full flex justify-center p-6 z-50 pointer-events-none">
+    <nav class="fixed bottom-0 left-0 w-full flex justify-center p-6 z-[60] pointer-events-none">
         <div class="bg-pd-black/80 backdrop-blur-xl border border-white/10 p-2 rounded-full flex gap-2 pointer-events-auto shadow-2xl">
             <a href="index.html" class="p-4 rounded-full bg-pd-green text-pd-black shadow-lg shadow-pd-green/20">
                 <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
@@ -218,9 +247,14 @@
                 </div>
 
                 <!-- Amount Input -->
-                <div class="mb-8 relative">
+                <div class="mb-4 relative">
                     <span class="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-mono font-bold text-pd-green opacity-50">₹</span>
-                    <input type="number" id="modal-amount" placeholder="0" class="w-full bg-white/5 border border-white/10 rounded-2xl py-8 pl-14 pr-6 text-4xl font-mono font-bold text-pd-green focus:outline-none focus:border-pd-green/50 placeholder:opacity-20 transition-all transition-all" autofocus />
+                    <input type="number" id="modal-amount" placeholder="0" class="w-full bg-white/5 border border-white/10 rounded-2xl py-8 pl-14 pr-6 text-4xl font-mono font-bold text-pd-green focus:outline-none focus:border-pd-green/50 placeholder:opacity-20 transition-all" autofocus />
+                </div>
+
+                <!-- Title/Description Input -->
+                <div class="mb-6">
+                    <input type="text" id="modal-title" placeholder="What's this for? (e.g. Masala Tea)" class="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-xs font-bold text-white focus:outline-none focus:border-pd-green/50 placeholder:opacity-20 transition-all" />
                 </div>
 
                 <!-- Category & Emoji Picker -->

@@ -8,8 +8,16 @@ import {
     fetchExpensesFromFirestore,
     deleteExpenseFromFirestore,
     saveUserToCloud,
-    fetchUserFromCloud
+    fetchUserFromCloud,
+    saveAchievements,
+    loadAchievements
 } from './firestore.js';
+import {
+    getStreak,
+    evaluateBadges,
+    checkAchievements,
+    showAchievementPopup
+} from './gamification.js';
 
 // --- STATE MANAGEMENT ---
 let state = {
@@ -19,6 +27,8 @@ let state = {
     targetDate: '',
     warningDismissed: false,
     selectedCategory: 'Tea',
+    achievements: [],
+    streak: 0,
     selectedEmoji: '☕'
 };
 
@@ -59,20 +69,21 @@ const saveExpenses = () => {
     localStorage.setItem('pocketday_expenses', JSON.stringify(state.expenses));
 };
 
-const calculateTodaySpent = (expenses) => {
-    const today = getTodayStr();
-    return expenses
-        .filter(e => e.date === today)
-        .reduce((sum, e) => sum + e.amount, 0);
-};
+// stats helper logic refactored into calculateStats
 
 const calculateStats = () => {
-    const todaySpent = calculateTodaySpent(state.expenses);
+    const today = getTodayStr();
+    const todayExpenses = state.expenses.filter(e => e.date === today);
+    const todaySpent = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
     const daysLeft = getDaysRemaining();
     
     // As per user request: (Balance / DaysLeft) - TodaySpent
     const dailyBudget = daysLeft > 0 ? state.balance / daysLeft : state.balance;
     const safeSpendToday = dailyBudget - todaySpent;
+
+    // Analytics: Transactions count, Biggest expense
+    const transactionCount = todayExpenses.length;
+    const biggestExpense = todayExpenses.length > 0 ? Math.max(...todayExpenses.map(e => e.amount)) : 0;
 
     // Survival Days: How long you'd last at your AVERAGE spending rate
     const uniqueDays = [...new Set(state.expenses.map(e => e.date))];
@@ -80,42 +91,65 @@ const calculateStats = () => {
     const avgDaily = uniqueDays.length > 0 ? totalSpentAllTime / uniqueDays.length : (dailyBudget || 1);
     const survivalDays = avgDaily > 0 ? state.balance / avgDaily : 0;
 
-    return { todaySpent, dailyBudget, safeSpendToday, daysLeft, survivalDays };
+    return { todaySpent, dailyBudget, safeSpendToday, daysLeft, survivalDays, transactionCount, biggestExpense };
 };
 
 const updateDashboard = () => {
-    const { todaySpent, dailyBudget, safeSpendToday, daysLeft, survivalDays } = calculateStats();
+    const { todaySpent, dailyBudget, safeSpendToday, survivalDays, transactionCount, biggestExpense } = calculateStats();
 
     // Update Text & Dynamic Quota
     const safeSpendEl = document.getElementById('safe-spend');
     const labelEl = document.getElementById('safe-spend-label');
+    const dailyBudgetEl = document.getElementById('daily-budget');
     
+    if (dailyBudgetEl) dailyBudgetEl.textContent = formatCurrency(dailyBudget);
+
+    // Color Coding Logic
     if (safeSpendToday < 0) {
         safeSpendEl.textContent = `₹${Math.abs(Math.round(safeSpendToday))}`;
-        if (labelEl) labelEl.textContent = "⚠ Overspent Today";
+        safeSpendEl.className = 'text-6xl font-mono font-bold text-pd-red';
+        if (labelEl) {
+            labelEl.textContent = `⚠ Overspent by ${formatCurrency(Math.abs(safeSpendToday))} today`;
+            labelEl.className = 'text-[10px] font-black text-pd-red tracking-[0.2em] uppercase text-center transition-all mb-1';
+        }
     } else {
         safeSpendEl.textContent = formatCurrency(safeSpendToday);
-        if (labelEl) labelEl.textContent = "Safe Spend Today";
+        if (labelEl) {
+            labelEl.textContent = "Safe Spend Today";
+            labelEl.className = 'text-[10px] font-black opacity-40 tracking-[0.3em] uppercase text-center transition-all mb-1';
+        }
+
+        if (safeSpendToday < 0.3 * dailyBudget) {
+            safeSpendEl.className = 'text-6xl font-mono font-bold text-pd-yellow';
+        } else {
+            safeSpendEl.className = 'text-6xl font-mono font-bold text-pd-green';
+        }
     }
 
+    // Dynamic Stats
     document.getElementById('days-remaining').textContent = Math.round(survivalDays);
     document.getElementById('total-balance').textContent = formatCurrency(state.balance);
     document.getElementById('today-spent').textContent = formatCurrency(todaySpent);
-    
-    const quotaEl = document.getElementById('daily-quota');
-    if (quotaEl) quotaEl.textContent = formatCurrency(dailyBudget);
+
+    // Activity Analytics Summary
+    const statCountEl = document.getElementById('stat-count');
+    const statSpentEl = document.getElementById('stat-spent');
+    const statBiggestEl = document.getElementById('stat-biggest');
+
+    if (statCountEl) statCountEl.textContent = transactionCount;
+    if (statSpentEl) statSpentEl.textContent = formatCurrency(todaySpent);
+    if (statBiggestEl) statBiggestEl.textContent = formatCurrency(biggestExpense);
 
     // Progress Bar
     const progressEl = document.getElementById('spend-progress');
     const ratio = dailyBudget > 0 ? (todaySpent / dailyBudget) * 100 : 0;
     progressEl.style.width = `${Math.min(100, ratio)}%`;
 
-    // Status Coloring
+    // Status Coloring for Progress Bar & Footer Warning
     const warningEl = document.getElementById('footer-warning');
 
     if (ratio >= 100 || dailyBudget < 50) {
         progressEl.className = 'bg-pd-red h-full transition-all duration-500';
-        safeSpendEl.className = 'text-6xl font-mono font-bold text-pd-red';
         if (!state.warningDismissed) {
             warningEl.classList.remove('hidden');
         } else {
@@ -123,12 +157,47 @@ const updateDashboard = () => {
         }
     } else if (ratio > 70 || dailyBudget < 100) {
         progressEl.className = 'bg-pd-yellow h-full transition-all duration-500';
-        safeSpendEl.className = 'text-6xl font-mono font-bold text-pd-yellow';
         warningEl.classList.add('hidden');
     } else {
         progressEl.className = 'bg-pd-green h-full transition-all duration-500';
-        safeSpendEl.className = 'text-6xl font-mono font-bold text-pd-green';
         warningEl.classList.add('hidden');
+    }
+
+    // --- GAMIFICATION UPDATES ---
+    const streak = getStreak(state.expenses);
+    const streakEl = document.getElementById('streak-container');
+    const streakCountEl = document.getElementById('streak-count');
+    
+    if (streak > 0) {
+        streakEl.classList.remove('hidden');
+        streakCountEl.textContent = `🔥 ${streak} Day No Spend Streak`;
+    } else {
+        streakEl.classList.add('hidden');
+    }
+
+    const badges = evaluateBadges(state.expenses);
+    const badgesContainer = document.getElementById('badges-container');
+    
+    if (badges.length > 0) {
+        badgesContainer.classList.remove('hidden');
+        badgesContainer.innerHTML = badges.map(b => `
+            <div class="flex-shrink-0 bg-white/5 border border-white/10 px-4 py-3 rounded-2xl flex items-center gap-2 animate-in zoom-in duration-300">
+                <span class="text-xl">${b.icon}</span>
+                <span class="text-[10px] font-black uppercase tracking-widest ${b.color}">${b.name}</span>
+            </div>
+        `).join('');
+    } else {
+        badgesContainer.classList.add('hidden');
+    }
+
+    // Check Achievements (Survive with > 500 etc)
+    const newAchievements = checkAchievements({ balance: state.balance, daysRemaining: getDaysRemaining() }, state.achievements);
+    if (newAchievements.length > 0) {
+        newAchievements.forEach(ach => {
+            state.achievements.push(ach);
+            showAchievementPopup(ach);
+            if (state.user) saveAchievements(state.user.uid, state.achievements);
+        });
     }
 };
 
@@ -147,8 +216,8 @@ const renderExpenses = () => {
             <div class="flex items-center gap-3">
                 <span class="text-xl">${getEmoji(exp.category)}</span>
                 <div>
-                    <span class="block font-bold text-sm">${exp.category}</span>
-                    <span class="text-[10px] opacity-40 uppercase font-bold">${new Date(exp.id).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span class="block font-bold text-sm text-white">${exp.title || exp.category}</span>
+                    <span class="text-[9px] opacity-40 uppercase font-black tracking-tighter">${new Date(exp.id).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
             </div>
             <div class="flex items-center gap-4">
@@ -200,11 +269,12 @@ window.selectCategory = (name, emoji) => {
 };
 
 // --- ACTIONS ---
-window.addExpense = async (amount, category) => {
+window.addExpense = async (amount, category, title = '') => {
     if (!amount || isNaN(amount) || amount <= 0) return;
     
     const expense = {
         category: category,
+        title: title,
         amount: parseFloat(amount),
         date: getTodayStr(),
         id: Date.now()
@@ -281,6 +351,9 @@ const initApp = () => {
                     state.targetDate = cloudUser.targetDate ?? state.targetDate;
                 }
 
+                // Load achievements from cloud if available
+                state.achievements = await loadAchievements(state.user.uid);
+                
                 const cloudExpenses = await fetchExpensesFromFirestore(user.uid);
                 // ALWAYS overwrite state.expenses when cloud data is fetched
                 // If cloud is empty, state should become empty.
@@ -383,10 +456,12 @@ const initApp = () => {
     
     document.getElementById('btn-submit-expense').addEventListener('click', () => {
         const amt = document.getElementById('modal-amount').value;
+        const title = document.getElementById('modal-title').value;
         if (amt > 0) {
-            window.addExpense(amt, state.selectedCategory);
+            window.addExpense(amt, state.selectedCategory, title);
             closeExpenseModal();
             document.getElementById('modal-amount').value = '';
+            document.getElementById('modal-title').value = '';
         }
     });
 
