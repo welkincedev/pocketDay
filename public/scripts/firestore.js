@@ -40,8 +40,9 @@ export const addExpenseToFirestore = async (uid, expense) => {
         category: expense.category,
         title: expense.title || '',
         amount: expense.amount,
-        date: getTodayStr(), // consistency with app.js
-        timestamp: serverTimestamp() // Using server side timestamp
+        date: expense.date, // User provided date
+        id: expense.id,     // Preserve original timestamp-based id
+        timestamp: serverTimestamp() 
     });
 };
 
@@ -49,11 +50,14 @@ export const fetchExpensesFromFirestore = async (uid) => {
     const q = query(
         collection(db, "expenses"), 
         where("uid", "==", uid),
-        orderBy("timestamp", "desc"),
-        limit(50) // Performance: only show recent 50
+        orderBy("id", "desc"), // Order by our internal timestamp ID
+        limit(100)
     );
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return querySnapshot.docs.map(doc => ({ 
+        firestoreId: doc.id, 
+        ...doc.data() 
+    }));
 };
 
 export const deleteExpenseFromFirestore = async (expenseDocId) => {

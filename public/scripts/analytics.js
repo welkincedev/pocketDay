@@ -27,14 +27,18 @@ const CATEGORY_COLORS = {
 };
 
 const initAnalytics = () => {
+    console.log("Analytics Initializing...");
     observeAuth(async (user) => {
         if (!user) {
+            console.log("No user, redirecting...");
             window.location.href = 'index.html';
             return;
         }
 
         try {
+            console.log("Fetching expenses for:", user.uid);
             const expenses = await fetchExpensesFromFirestore(user.uid);
+            console.log("Expenses fetched:", expenses.length);
             renderDashboard(expenses);
         } catch (e) {
             console.error("Analytics fetch failed:", e);
@@ -129,6 +133,11 @@ const renderCategoryChart = (expenses) => {
     const bgColors = labels.map(label => CATEGORY_COLORS[label] || COLORS.other);
 
     if (categoryChart) categoryChart.destroy();
+
+    if (labels.length === 0) {
+        console.warn("No category data found for chart");
+        return;
+    }
 
     categoryChart = new Chart(ctx, {
         type: 'doughnut',

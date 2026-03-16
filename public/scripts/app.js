@@ -43,6 +43,17 @@ const CATEGORIES = [
     { name: 'Other', emoji: '💸' }
 ];
 
+const SURVIVAL_MESSAGES = [
+    "Today we survive on water.",
+    "Maggi is your financial advisor tonight.",
+    "Cancel Swiggy. Cook noodles.",
+    "Sleep early to save money.",
+    "Hostel mess is your best friend now.",
+    "Forget the Chai, drink only air.",
+    "Walking is the only transportation.",
+    "Window shopping is free. Stay there."
+];
+
 // --- UTILS ---
 const getTodayStr = () => {
     const d = new Date();
@@ -55,7 +66,9 @@ const formatCurrency = (amt) => new Intl.NumberFormat('en-IN', {
 
 const getDaysRemaining = () => {
     if (!state.targetDate) return 1;
-    const diff = new Date(state.targetDate) - new Date();
+    const target = new Date(state.targetDate + 'T23:59:59'); // End of that day
+    const now = new Date();
+    const diff = target - now;
     return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 };
 
@@ -77,9 +90,12 @@ const calculateStats = () => {
     const todaySpent = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
     const daysLeft = getDaysRemaining();
     
-    // As per user request: (Balance / DaysLeft) - TodaySpent
-    const dailyBudget = daysLeft > 0 ? state.balance / daysLeft : state.balance;
-    const safeSpendToday = dailyBudget - todaySpent;
+    // Stabilized Daily Quota: Original share for today
+    // (Current Balance + what we spent today) / days left
+    const dailyQuota = daysLeft > 0 ? (state.balance + todaySpent) / daysLeft : state.balance + todaySpent;
+    
+    // Safe Spend Today: What's actually left of today's quota
+    const safeSpendToday = dailyQuota - todaySpent;
 
     // Analytics: Transactions count, Biggest expense
     const transactionCount = todayExpenses.length;
@@ -88,10 +104,10 @@ const calculateStats = () => {
     // Survival Days: How long you'd last at your AVERAGE spending rate
     const uniqueDays = [...new Set(state.expenses.map(e => e.date))];
     const totalSpentAllTime = state.expenses.reduce((sum, e) => sum + e.amount, 0);
-    const avgDaily = uniqueDays.length > 0 ? totalSpentAllTime / uniqueDays.length : (dailyBudget || 1);
+    const avgDaily = uniqueDays.length > 0 ? totalSpentAllTime / uniqueDays.length : (dailyQuota || 1);
     const survivalDays = avgDaily > 0 ? state.balance / avgDaily : 0;
 
-    return { todaySpent, dailyBudget, safeSpendToday, daysLeft, survivalDays, transactionCount, biggestExpense };
+    return { todaySpent, dailyBudget: dailyQuota, safeSpendToday, daysLeft, survivalDays, transactionCount, biggestExpense };
 };
 
 const updateDashboard = () => {
@@ -141,27 +157,63 @@ const updateDashboard = () => {
     if (statBiggestEl) statBiggestEl.textContent = formatCurrency(biggestExpense);
 
     // Progress Bar
-    const progressEl = document.getElementById('spend-progress');
+    const progressEl = document.getElementById('daily-progress-bar');
+    const percentEl = document.getElementById('daily-progress-percent');
     const ratio = dailyBudget > 0 ? (todaySpent / dailyBudget) * 100 : 0;
-    progressEl.style.width = `${Math.min(100, ratio)}%`;
+    
+    if (progressEl) {
+        progressEl.style.width = `${Math.min(100, ratio)}%`;
+        
+        // Color Logic: Green < 70%, Yellow 70-100%, Red > 100%
+        if (ratio >= 100) {
+            progressEl.className = 'bg-pd-red h-full transition-all duration-500 shadow-[0_0_10px_rgba(255,65,54,0.5)]';
+        } else if (ratio >= 70) {
+            progressEl.className = 'bg-pd-yellow h-full transition-all duration-500 shadow-[0_0_10px_rgba(255,251,61,0.5)]';
+        } else {
+            progressEl.className = 'bg-pd-green h-full transition-all duration-500 shadow-[0_0_10px_rgba(0,255,65,0.5)]';
+        }
+    }
 
-    // Status Coloring for Progress Bar & Footer Warning
+    if (percentEl) {
+        percentEl.textContent = `${Math.round(ratio)}%`;
+    }
+
+    // Status Footer Warning Logic
     const warningEl = document.getElementById('footer-warning');
+    const brokeMsgEl = document.getElementById('broke-message');
 
-    if (ratio >= 100 || dailyBudget < 50) {
-        progressEl.className = 'bg-pd-red h-full transition-all duration-500';
+    if (safeSpendToday < 0 || dailyBudget < 50) {
         if (!state.warningDismissed) {
             warningEl.classList.remove('hidden');
+            
+            // Update Title with overspent amount
+            const overspentAmt = Math.abs(Math.round(safeSpendToday));
+            const titleEl = warningEl.querySelector('p.font-black');
+            if (titleEl) {
+                titleEl.textContent = safeSpendToday < 0 ? `Broke Mode Active • Overspent ₹${overspentAmt}` : `Broke Mode Active`;
+            }
+
+            // Randomize message if just shown
+            if (brokeMsgEl && brokeMsgEl.textContent === "") {
+                const msg = SURVIVAL_MESSAGES[Math.floor(Math.random() * SURVIVAL_MESSAGES.length)];
+                brokeMsgEl.textContent = msg;
+            }
         } else {
             warningEl.classList.add('hidden');
         }
-    } else if (ratio > 70 || dailyBudget < 100) {
-        progressEl.className = 'bg-pd-yellow h-full transition-all duration-500';
-        warningEl.classList.add('hidden');
+        
+        // Broke Mode Accent triggers
+        if (safeSpendToday < 0) {
+            document.body.classList.add('border-t-2', 'border-pd-red');
+        }
     } else {
-        progressEl.className = 'bg-pd-green h-full transition-all duration-500';
         warningEl.classList.add('hidden');
+        if (brokeMsgEl) brokeMsgEl.textContent = ""; // Reset for next time
+        document.body.classList.remove('border-t-2', 'border-pd-red');
     }
+
+    // --- WEEKLY HEATMAP ---
+    renderWeeklyHeatmap(dailyBudget);
 
     // --- GAMIFICATION UPDATES ---
     const streak = getStreak(state.expenses);
@@ -203,34 +255,111 @@ const updateDashboard = () => {
 
 const renderExpenses = () => {
     const listEl = document.getElementById('expense-list');
-    const today = getTodayStr();
-    const todayExpenses = state.expenses.filter(e => e.date === today);
+    if (!listEl) return;
 
-    if (todayExpenses.length === 0) {
-        listEl.innerHTML = `<div class="text-center py-12 opacity-20 italic text-sm border border-dashed border-white/10 rounded-2xl">No expenses logged yet.</div>`;
+    if (state.expenses.length === 0) {
+        listEl.innerHTML = `
+            <div class="text-center py-12 opacity-20 italic text-sm border border-dashed border-white/10 rounded-2xl">
+                No expenses logged yet.
+            </div>
+        `;
         return;
     }
 
-    listEl.innerHTML = todayExpenses.map(exp => `
-        <div class="bg-white/5 p-4 rounded-2xl border border-white/5 flex justify-between items-center animate-in fade-in slide-in-from-bottom-2">
-            <div class="flex items-center gap-3">
-                <span class="text-xl">${getEmoji(exp.category)}</span>
-                <div>
-                    <span class="block font-bold text-sm text-white">${exp.title || exp.category}</span>
-                    <span class="text-[9px] opacity-40 uppercase font-black tracking-tighter">${new Date(exp.id).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+    // Sort expenses by ID (timestamp) descending
+    const sortedExpenses = [...state.expenses].sort((a, b) => b.id - a.id);
+    
+    // Group by date
+    const groups = {};
+    sortedExpenses.forEach(exp => {
+        if (!groups[exp.date]) groups[exp.date] = [];
+        groups[exp.date].push(exp);
+    });
+
+    const todayDate = getTodayStr();
+
+    listEl.innerHTML = Object.entries(groups).map(([date, items]) => {
+        const isToday = date === todayDate;
+        const dateObj = new Date(date + 'T00:00:00'); // Ensure local time
+        const dateLabel = isToday ? 'Today' : dateObj.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+        
+        return `
+            <div class="mb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                <h4 class="text-[9px] font-black opacity-30 uppercase tracking-[0.2em] mb-3 px-1">${dateLabel}</h4>
+                <div class="flex flex-col gap-2">
+                    ${items.map(exp => `
+                        <div class="bg-white/5 p-4 rounded-2xl border border-white/5 flex justify-between items-center group active:scale-[0.98] transition-all">
+                            <div class="flex items-center gap-3">
+                                <span class="text-xl shrink-0">${getEmoji(exp.category)}</span>
+                                <div class="overflow-hidden">
+                                    <span class="block font-bold text-sm text-white truncate w-full max-w-[180px]">${exp.title || exp.category}</span>
+                                    <span class="text-[9px] opacity-40 uppercase font-black tracking-tighter">${new Date(exp.id).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <span class="font-mono font-bold text-pd-red">-${formatCurrency(exp.amount)}</span>
+                                <button onclick="deleteExpense(${exp.id}, '${exp.firestoreId || ''}')" class="opacity-20 hover:opacity-100 p-2 -mr-2 text-pd-red transition-all">✕</button>
+                            </div>
+                        </div>
+                    `).join('')}
                 </div>
             </div>
-            <div class="flex items-center gap-4">
-                <span class="font-mono font-bold text-pd-red">-${formatCurrency(exp.amount)}</span>
-                <button onclick="deleteExpense(${exp.id}, '${exp.firestoreId || ''}')" class="opacity-20 hover:opacity-100 p-1 text-pd-red transition-opacity">✕</button>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 };
 
 const getEmoji = (cat) => {
     const found = CATEGORIES.find(c => c.name === cat);
     return found ? found.emoji : '💸';
+};
+
+const renderWeeklyHeatmap = (dailyBudget) => {
+    const heatmapEl = document.getElementById('weekly-heatmap');
+    if (!heatmapEl) return;
+
+    const last7Days = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        last7Days.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    }
+
+    const dailyTotals = {};
+    state.expenses.forEach(e => {
+        if (last7Days.includes(e.date)) {
+            dailyTotals[e.date] = (dailyTotals[e.date] || 0) + e.amount;
+        }
+    });
+
+    heatmapEl.innerHTML = last7Days.map(date => {
+        const total = dailyTotals[date] || 0;
+        const ratio = dailyBudget > 0 ? (total / dailyBudget) : 0;
+        const dayLabel = new Date(date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short' });
+        
+        let bgColor = 'bg-white/5'; // Gray - No spending
+        let barHeight = 'h-2'; 
+        
+        if (total > 0) {
+            if (ratio > 1) {
+                bgColor = 'bg-pd-red shadow-[0_0_10px_rgba(255,65,54,0.3)]';
+            } else if (ratio >= 0.5) {
+                bgColor = 'bg-pd-yellow shadow-[0_0_10px_rgba(255,251,61,0.3)]';
+            } else {
+                bgColor = 'bg-pd-green shadow-[0_0_10px_rgba(0,255,65,0.3)]';
+            }
+            barHeight = `h-[${Math.max(20, Math.min(100, Math.round(ratio * 60)))}%]`;
+        }
+
+        // Using inline style for dynamic height since Tailwind h-[x%] is tricky with JIT if not predefined
+        const styleHeight = total > 0 ? `height: ${Math.max(20, Math.min(100, Math.round((total / (dailyBudget * 1.5)) * 100)))}%` : 'height: 8px';
+
+        return `
+            <div class="flex-1 flex flex-col items-center gap-2 group h-full justify-end">
+                <div class="w-full ${bgColor} rounded-md transition-all duration-700" style="${styleHeight}"></div>
+                <span class="text-[7px] font-black opacity-30 uppercase tracking-tighter">${dayLabel}</span>
+            </div>
+        `;
+    }).join('');
 };
 
 // --- MODAL LOGIC ---
@@ -355,13 +484,14 @@ const initApp = () => {
                 state.achievements = await loadAchievements(state.user.uid);
                 
                 const cloudExpenses = await fetchExpensesFromFirestore(user.uid);
-                // ALWAYS overwrite state.expenses when cloud data is fetched
-                // If cloud is empty, state should become empty.
-                state.expenses = cloudExpenses;
                 
-                saveMetaData();
-                saveExpenses();
-
+                // Merge Logic: If we have local expenses that aren't in the cloud yet, keep them.
+                // But for a simple '1.0' experience, cloud is usually source of truth once logged in.
+                if (cloudExpenses.length > 0) {
+                    state.expenses = cloudExpenses;
+                    saveExpenses(); // Sync local storage with latest cloud
+                }
+                
                 // AUTOMATIC SETUP: If logged in but no balance/date set in cloud or local
                 if (!state.balance && !state.targetDate) {
                     setupFirstLaunch();
@@ -369,7 +499,10 @@ const initApp = () => {
             } catch (e) {
                 console.error("Initial cloud sync failed, using local fallback", e);
             }
+            updateDashboard();
+            renderExpenses();
         } else {
+            state.user = null;
             landingEl.classList.remove('hidden');
             appEl.classList.add('hidden');
             profileEl.classList.add('hidden');
