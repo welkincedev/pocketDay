@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PocketDay Analytics | Insights</title>
+    
+    <!-- CSS & Fonts -->
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'pd-black': '#0A0A0A',
+                        'pd-green': '#00FF41',
+                        'pd-yellow': '#FFFB3D',
+                        'pd-red': '#FF4136',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-pd-black text-white font-sans min-h-screen flex flex-col items-center">
+    
+    <div id="app" class="w-full max-w-[420px] flex flex-col gap-8 p-6 pb-32 min-h-screen">
+        
+        <!-- Header -->
+        <header class="flex justify-between items-center py-2">
+            <a href="index.html" class="w-10 h-10 bg-white/5 rounded-2xl flex items-center justify-center border border-white/5 active:scale-95 transition-all">
+                <span class="text-xl">←</span>
+            </a>
+            <h1 class="text-xs font-bold uppercase tracking-[0.3em] opacity-40">Analytics</h1>
+            <div class="w-10"></div> <!-- Spacer -->
+        </header>
+
+        <!-- Monthly Summary Card -->
+        <section class="bg-white/5 border border-white/10 p-6 rounded-[32px] text-center">
+            <span class="text-[10px] font-bold opacity-30 uppercase tracking-[0.2em] mb-2 block">Monthly Total</span>
+            <div id="monthly-total" class="text-4xl font-mono font-bold text-pd-green">₹0</div>
+        </section>
+
+        <!-- Weekly Spending Chart -->
+        <section class="space-y-4">
+            <h3 class="text-[10px] font-bold opacity-40 uppercase tracking-widest px-1">Weekly Trend</h3>
+            <div class="bg-white/5 border border-white/10 p-4 rounded-[32px] aspect-[4/3] flex items-center justify-center">
+                <canvas id="weeklyChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Category Breakdown -->
+        <section class="space-y-4">
+            <h3 class="text-[10px] font-bold opacity-40 uppercase tracking-widest px-1">Category Split</h3>
+            <div class="bg-white/5 border border-white/10 p-8 rounded-[32px] aspect-square flex items-center justify-center relative">
+                <canvas id="categoryChart"></canvas>
+                <div id="category-legend" class="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-4 text-[8px] font-bold opacity-40">
+                    <!-- Legend items injected here -->
+                </div>
+            </div>
+        </section>
+        
+        <!-- Survival Health Info -->
+        <section class="bg-pd-green/10 border border-pd-green/20 p-6 rounded-[32px]">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="text-xl">📊</span>
+                <span class="text-[10px] font-bold text-pd-green uppercase tracking-widest">Spending Insight</span>
+            </div>
+            <p id="spending-insight" class="text-xs leading-relaxed opacity-60">
+                You're maintaining a healthy survival rate. Keep up the good work!
+            </p>
+        </section>
+
+    </div>
+
+    <!-- Navigation Bar -->
+    <nav class="fixed bottom-0 left-0 w-full flex justify-center p-6 z-50 pointer-events-none">
+        <div class="bg-pd-black/80 backdrop-blur-xl border border-white/10 p-2 rounded-full flex gap-2 pointer-events-auto shadow-2xl">
+            <a href="index.html" class="p-4 rounded-full opacity-40 hover:opacity-100 transition-all">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+            </a>
+            <a href="analytics.html" class="p-4 rounded-full bg-pd-green text-pd-black shadow-lg shadow-pd-green/20">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.09-4-4L2 17.08z"/></svg>
+            </a>
+        </div>
+    </nav>
+
+    <script src="scripts/analytics.js" type="module"></script>
+</body>
+</html>

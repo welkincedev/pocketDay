@@ -48,7 +48,7 @@ export const fetchExpensesFromFirestore = async (uid) => {
     const q = query(
         collection(db, "expenses"), 
         where("uid", "==", uid),
-        orderBy("id", "desc"),
+        orderBy("timestamp", "desc"),
         limit(50) // Performance: only show recent 50
     );
     const querySnapshot = await getDocs(q);

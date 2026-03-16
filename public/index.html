@@ -97,7 +97,7 @@
             <button id="install-app" class="hidden absolute top-4 right-0 bg-pd-green text-pd-black text-[10px] font-bold px-3 py-1 rounded-full active:scale-95 transition-transform uppercase tracking-tighter">
                 Install App
             </button>
-            <span class="text-xs font-semibold opacity-40 tracking-widest uppercase">Safe Spend Today</span>
+            <span id="safe-spend-label" class="text-xs font-semibold opacity-40 tracking-widest uppercase text-center transition-all">Safe Spend Today</span>
             <div id="safe-spend" class="text-6xl font-mono font-bold text-pd-green transition-all duration-500">₹0</div>
             
             <!-- Spending Progress Bar -->
@@ -172,18 +172,58 @@
             +
         </button>
 
-        <!-- Broke Mode Warning Card -->
-        <footer id="footer-warning" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-[380px] bg-pd-red/90 backdrop-blur-md text-pd-black p-4 rounded-2xl shadow-[0_20px_50px_rgba(255,65,54,0.3)] z-50 animate-bounce-subtle border border-white/20">
-            <div class="flex items-center justify-between gap-3">
-                <div class="flex items-center gap-3">
-                    <span class="text-xl shrink-0">⚠</span>
-                    <p class="font-black text-[11px] leading-tight uppercase tracking-tighter">Broke Mode Active • Stop Spending Immediately</p>
-                </div>
-                <button id="btn-close-warning" class="p-1 hover:bg-black/10 rounded-lg transition-colors shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
-            </div>
         </footer>
+    </div>
+
+    <!-- Navigation Bar -->
+    <nav class="fixed bottom-0 left-0 w-full flex justify-center p-6 z-50 pointer-events-none">
+        <div class="bg-pd-black/80 backdrop-blur-xl border border-white/10 p-2 rounded-full flex gap-2 pointer-events-auto shadow-2xl">
+            <a href="index.html" class="p-4 rounded-full bg-pd-green text-pd-black shadow-lg shadow-pd-green/20">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+            </a>
+            <a href="analytics.html" class="p-4 rounded-full opacity-40 hover:opacity-100 transition-all">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.09-4-4L2 17.08z"/></svg>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Expense Modal -->
+    <div id="expense-modal" class="hidden fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-4">
+        <!-- Backdrop -->
+        <div id="modal-backdrop" class="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity duration-300"></div>
+        
+        <!-- Modal Content -->
+        <div class="relative w-full max-w-[400px] bg-pd-black border border-white/10 rounded-[32px] shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
+            <div class="p-6">
+                <!-- Header -->
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xs font-bold uppercase tracking-[0.2em] opacity-40">Add Expense</h2>
+                    <button id="btn-close-modal" class="w-8 h-8 flex items-center justify-center bg-white/5 rounded-full hover:bg-white/10 transition-colors text-white/40 hover:text-white">✕</button>
+                </div>
+
+                <!-- Amount Input -->
+                <div class="mb-8 relative">
+                    <span class="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-mono font-bold text-pd-green opacity-50">₹</span>
+                    <input type="number" id="modal-amount" placeholder="0" class="w-full bg-white/5 border border-white/10 rounded-2xl py-8 pl-14 pr-6 text-4xl font-mono font-bold text-pd-green focus:outline-none focus:border-pd-green/50 placeholder:opacity-20 transition-all transition-all" autofocus />
+                </div>
+
+                <!-- Category & Emoji Picker -->
+                <div class="space-y-6">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase tracking-widest opacity-40 block mb-4">Category & Emoji</span>
+                        <div id="emoji-grid" class="grid grid-cols-4 gap-3">
+                            <!-- Emojis will be injected via JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8">
+                    <button id="btn-submit-expense" class="w-full bg-pd-green text-pd-black font-black py-5 rounded-2xl active:scale-95 transition-all shadow-[0_10px_30px_rgba(0,255,65,0.2)]">
+                        LOG EXPENSE
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->

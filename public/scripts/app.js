@@ -17,8 +17,21 @@ let state = {
     balance: 0,
     expenses: [],
     targetDate: '',
-    warningDismissed: false
+    warningDismissed: false,
+    selectedCategory: 'Tea',
+    selectedEmoji: '☕'
 };
+
+const CATEGORIES = [
+    { name: 'Tea', emoji: '☕' },
+    { name: 'Snack', emoji: '🍪' },
+    { name: 'Bus', emoji: '🚌' },
+    { name: 'Food', emoji: '🍔' },
+    { name: 'Grocery', emoji: '🛒' },
+    { name: 'Study', emoji: '📚' },
+    { name: 'Party', emoji: '🎉' },
+    { name: 'Other', emoji: '💸' }
+];
 
 // --- UTILS ---
 const getTodayStr = () => {
@@ -46,42 +59,63 @@ const saveExpenses = () => {
     localStorage.setItem('pocketday_expenses', JSON.stringify(state.expenses));
 };
 
-const calculateStats = () => {
+const calculateTodaySpent = (expenses) => {
     const today = getTodayStr();
-    const todayExpenses = state.expenses.filter(e => e.date === today);
-    const todaySpent = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+    return expenses
+        .filter(e => e.date === today)
+        .reduce((sum, e) => sum + e.amount, 0);
+};
 
+const calculateStats = () => {
+    const todaySpent = calculateTodaySpent(state.expenses);
     const daysLeft = getDaysRemaining();
-    const safeDaily = state.balance / daysLeft;
 
-    // Avg Daily Spend (Last 7 days or all time)
+    // Total money available at the start of today (including what was spent today)
+    const startingBalanceToday = state.balance + todaySpent;
+    
+    // The fixed daily share for all remaining days
+    const dailyBudget = daysLeft > 0 ? startingBalanceToday / daysLeft : startingBalanceToday;
+    
+    // How much of today's share is left
+    const safeSpendToday = dailyBudget - todaySpent;
+
+    // Survival Days: How long you'd last at your AVERAGE spending rate
     const uniqueDays = [...new Set(state.expenses.map(e => e.date))];
     const totalSpentAllTime = state.expenses.reduce((sum, e) => sum + e.amount, 0);
-    const avgDaily = uniqueDays.length > 0 ? totalSpentAllTime / uniqueDays.length : 0;
-    const survivalDays = avgDaily > 0 ? state.balance / avgDaily : state.balance / (safeDaily || 1);
+    const avgDaily = uniqueDays.length > 0 ? totalSpentAllTime / uniqueDays.length : (dailyBudget || 1);
+    const survivalDays = avgDaily > 0 ? state.balance / avgDaily : 0;
 
-    return { todaySpent, safeDaily, daysLeft, survivalDays };
+    return { todaySpent, dailyBudget, safeSpendToday, daysLeft, survivalDays };
 };
 
 const updateDashboard = () => {
-    const { todaySpent, safeDaily, daysLeft, survivalDays } = calculateStats();
+    const { todaySpent, dailyBudget, safeSpendToday, daysLeft, survivalDays } = calculateStats();
 
-    // Update Text
-    document.getElementById('safe-spend').textContent = formatCurrency(safeDaily);
-    document.getElementById('days-remaining').textContent = daysLeft;
+    // Update Text & Dynamic Quota
+    const safeSpendEl = document.getElementById('safe-spend');
+    const labelEl = document.getElementById('safe-spend-label');
+    
+    if (safeSpendToday < 0) {
+        safeSpendEl.textContent = `₹${Math.abs(Math.round(safeSpendToday))}`;
+        if (labelEl) labelEl.textContent = "⚠ Overspent Today";
+    } else {
+        safeSpendEl.textContent = formatCurrency(safeSpendToday);
+        if (labelEl) labelEl.textContent = "Safe Spend Today";
+    }
+
+    document.getElementById('days-remaining').textContent = Math.round(survivalDays);
     document.getElementById('total-balance').textContent = formatCurrency(state.balance);
     document.getElementById('today-spent').textContent = formatCurrency(todaySpent);
 
     // Progress Bar
     const progressEl = document.getElementById('spend-progress');
-    const ratio = safeDaily > 0 ? (todaySpent / safeDaily) * 100 : 0;
+    const ratio = dailyBudget > 0 ? (todaySpent / dailyBudget) * 100 : 0;
     progressEl.style.width = `${Math.min(100, ratio)}%`;
 
     // Status Coloring
-    const safeSpendEl = document.getElementById('safe-spend');
     const warningEl = document.getElementById('footer-warning');
 
-    if (ratio >= 100 || safeDaily < 50) {
+    if (ratio >= 100 || dailyBudget < 50) {
         progressEl.className = 'bg-pd-red h-full transition-all duration-500';
         safeSpendEl.className = 'text-6xl font-mono font-bold text-pd-red';
         if (!state.warningDismissed) {
@@ -89,7 +123,7 @@ const updateDashboard = () => {
         } else {
             warningEl.classList.add('hidden');
         }
-    } else if (ratio > 70 || safeDaily < 100) {
+    } else if (ratio > 70 || dailyBudget < 100) {
         progressEl.className = 'bg-pd-yellow h-full transition-all duration-500';
         safeSpendEl.className = 'text-6xl font-mono font-bold text-pd-yellow';
         warningEl.classList.add('hidden');
@@ -128,8 +162,43 @@ const renderExpenses = () => {
 };
 
 const getEmoji = (cat) => {
-    const emojis = { 'Tea': '☕', 'Snack': '🍪', 'Bus': '🚌', 'Transport': '🚌', 'Food': '🍔' };
-    return emojis[cat] || '💸';
+    const found = CATEGORIES.find(c => c.name === cat);
+    return found ? found.emoji : '💸';
+};
+
+// --- MODAL LOGIC ---
+const openExpenseModal = (initialAmt = '', initialCat = 'Tea') => {
+    const modal = document.getElementById('expense-modal');
+    const amtInput = document.getElementById('modal-amount');
+    
+    state.selectedCategory = initialCat;
+    state.selectedEmoji = getEmoji(initialCat);
+    
+    renderEmojiGrid();
+    amtInput.value = initialAmt;
+    modal.classList.remove('hidden');
+    amtInput.focus();
+};
+
+const closeExpenseModal = () => {
+    document.getElementById('expense-modal').classList.add('hidden');
+};
+
+const renderEmojiGrid = () => {
+    const grid = document.getElementById('emoji-grid');
+    grid.innerHTML = CATEGORIES.map(cat => `
+        <button class="emoji-btn p-3 rounded-2xl border transition-all flex flex-col items-center gap-1 ${state.selectedCategory === cat.name ? 'bg-pd-green border-pd-green text-pd-black scale-95' : 'bg-white/5 border-white/5 opacity-60 hover:opacity-100 hover:bg-white/10'}" 
+                onclick="selectCategory('${cat.name}', '${cat.emoji}')">
+            <span class="text-xl">${cat.emoji}</span>
+            <span class="text-[8px] font-bold uppercase">${cat.name}</span>
+        </button>
+    `).join('');
+};
+
+window.selectCategory = (name, emoji) => {
+    state.selectedCategory = name;
+    state.selectedEmoji = emoji;
+    renderEmojiGrid();
 };
 
 // --- ACTIONS ---
@@ -295,13 +364,9 @@ const initApp = () => {
     // Set up Quick Actions
     document.querySelectorAll('#quick-actions button').forEach(btn => {
         btn.addEventListener('click', () => {
-            if (btn.id === 'btn-custom') {
-                const amt = prompt("Amount?");
-                const cat = prompt("Category?");
-                if (amt && cat) window.addExpense(amt, cat);
-            } else {
-                window.addExpense(btn.dataset.amount, btn.textContent.trim().split(' ').pop());
-            }
+            const cat = btn.dataset.category || btn.textContent.trim().split(' ').pop();
+            const amt = btn.dataset.amount || '';
+            openExpenseModal(amt, cat);
         });
     });
 
@@ -310,11 +375,22 @@ const initApp = () => {
     if (fab) {
         fab.addEventListener('click', (e) => {
             e.preventDefault();
-            const amt = prompt("Amount?");
-            const cat = prompt("Category (e.g. Food, Bus)?", "Custom");
-            if (amt && cat) window.addExpense(amt, cat);
+            openExpenseModal();
         });
     }
+
+    // Modal Events
+    document.getElementById('btn-close-modal').addEventListener('click', closeExpenseModal);
+    document.getElementById('modal-backdrop').addEventListener('click', closeExpenseModal);
+    
+    document.getElementById('btn-submit-expense').addEventListener('click', () => {
+        const amt = document.getElementById('modal-amount').value;
+        if (amt > 0) {
+            window.addExpense(amt, state.selectedCategory);
+            closeExpenseModal();
+            document.getElementById('modal-amount').value = '';
+        }
+    });
 
     // Warning Close
     document.getElementById('btn-close-warning').addEventListener('click', () => {
