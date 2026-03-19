@@ -11,7 +11,8 @@ import {
     serverTimestamp,
     setDoc,
     getDoc,
-    limit
+    limit,
+    onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 export const saveUserToCloud = async (uid, userData) => {
@@ -60,6 +61,28 @@ export const fetchExpensesFromFirestore = async (uid) => {
     
     // Sort by 'id' (our timestamp) descending in JS to avoid composite index requirement
     return expenses.sort((a, b) => b.id - a.id);
+};
+
+// Real-time Listener for Expenses
+export const listenToExpenses = (uid, callback) => {
+    const q = query(
+        collection(db, "expenses"),
+        where("uid", "==", uid),
+        limit(100)
+    );
+
+    return onSnapshot(q, (querySnapshot) => {
+        const expenses = querySnapshot.docs.map(doc => ({
+            firestoreId: doc.id,
+            ...doc.data()
+        }));
+        
+        // Sort by 'id' (our timestamp) descending in JS
+        const sorted = expenses.sort((a, b) => b.id - a.id);
+        callback(sorted);
+    }, (error) => {
+        console.error("Firestore Listen Error:", error);
+    });
 };
 
 export const deleteExpenseFromFirestore = async (expenseDocId) => {

@@ -1,5 +1,5 @@
 import { observeAuth } from './auth.js';
-import { fetchExpensesFromFirestore } from './firestore.js';
+import { listenToExpenses } from './firestore.js';
 
 let weeklyChart = null;
 let categoryChart = null;
@@ -29,21 +29,69 @@ const CATEGORY_COLORS = {
 const initAnalytics = () => {
     console.log("Analytics Initializing...");
     observeAuth(async (user) => {
-        if (!user) {
-            console.log("No user, redirecting...");
+        if (user === null) {
+            // Only redirect if we are sure no user is logged in
+            console.log("No user confirmed, redirecting...");
             window.location.href = 'index.html';
             return;
         }
+        if (!user) return; // Still loading
+
+        // Populate User Profile
+        const nameEl = document.getElementById('user-name');
+        const avatarEl = document.getElementById('user-avatar');
+        if (nameEl) nameEl.textContent = user.displayName;
+        if (avatarEl) avatarEl.src = user.photoURL;
 
         try {
-            console.log("Fetching expenses for:", user.uid);
-            const expenses = await fetchExpensesFromFirestore(user.uid);
-            console.log("Expenses fetched:", expenses.length);
-            renderDashboard(expenses);
+            console.log("Setting up real-time listener for:", user.uid);
+            listenToExpenses(user.uid, (expenses) => {
+                console.log("Analytics real-time update:", expenses.length);
+                renderDashboard(expenses);
+            });
         } catch (e) {
-            console.error("Analytics fetch failed:", e);
+            console.error("Analytics listener failed:", e);
         }
     });
+
+    // Dropdown Logic
+    const avatarBtn = document.getElementById('btn-avatar');
+    const dropdown = document.getElementById('profile-dropdown');
+
+    const toggleDropdown = (show) => {
+        if (!dropdown) return;
+        if (show) {
+            dropdown.classList.remove('scale-95', 'opacity-0', 'pointer-events-none');
+            dropdown.classList.add('scale-100', 'opacity-100');
+        } else {
+            dropdown.classList.remove('scale-100', 'opacity-100');
+            dropdown.classList.add('scale-95', 'opacity-0', 'pointer-events-none');
+        }
+    };
+
+    if (avatarBtn) {
+        avatarBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = dropdown.classList.contains('opacity-100');
+            toggleDropdown(!isOpen);
+        });
+    }
+
+    document.addEventListener('click', (e) => {
+        if (dropdown && !dropdown.contains(e.target) && !avatarBtn.contains(e.target)) {
+            toggleDropdown(false);
+        }
+    });
+
+    // Logout Action
+    const logoutBtn = document.getElementById('btn-logout');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            if (confirm("Logout?")) {
+                import('./auth.js').then(auth => auth.logout());
+            }
+        });
+    }
 };
 
 const renderDashboard = (expenses) => {

@@ -5,7 +5,7 @@ import {
 } from './auth.js';
 import {
     addExpenseToFirestore,
-    fetchExpensesFromFirestore,
+    listenToExpenses,
     deleteExpenseFromFirestore,
     saveUserToCloud,
     fetchUserFromCloud,
@@ -41,6 +41,17 @@ const CATEGORIES = [
     { name: 'Study', emoji: '📚' },
     { name: 'Party', emoji: '🎉' },
     { name: 'Other', emoji: '💸' }
+];
+
+const SURVIVAL_MESSAGES = [
+    "Today we survive on water.",
+    "Maggi is your financial advisor tonight.",
+    "Cancel Swiggy. Cook noodles.",
+    "Sleep early to save money.",
+    "Hostel mess is your best friend now.",
+    "Forget the Chai, drink only air.",
+    "Walking is the only transportation.",
+    "Window shopping is free. Stay there."
 ];
 
 // --- UTILS ---
@@ -79,12 +90,13 @@ const calculateStats = () => {
     const todaySpent = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
     const daysLeft = getDaysRemaining();
     
-    // Stabilized Daily Quota: Original share for today
-    // (Current Balance + what we spent today) / days left
-    const dailyQuota = daysLeft > 0 ? (state.balance + todaySpent) / daysLeft : state.balance + todaySpent;
+    // User Standardized Survival Logic:
+    // 1. remainingBalance = state.balance (which already has initial - totalSpent)
+    // 2. dailyAverage = remainingBalance / daysRemaining
+    const dailyAverage = daysLeft > 0 ? state.balance / daysLeft : state.balance;
     
-    // Safe Spend Today: What's actually left of today's quota
-    const safeSpendToday = dailyQuota - todaySpent;
+    // 4. safeSpendToday = dailyAverage - todaySpent
+    const safeSpendToday = dailyAverage - todaySpent;
 
     // Analytics: Transactions count, Biggest expense
     const transactionCount = todayExpenses.length;
@@ -93,10 +105,10 @@ const calculateStats = () => {
     // Survival Days: How long you'd last at your AVERAGE spending rate
     const uniqueDays = [...new Set(state.expenses.map(e => e.date))];
     const totalSpentAllTime = state.expenses.reduce((sum, e) => sum + e.amount, 0);
-    const avgDaily = uniqueDays.length > 0 ? totalSpentAllTime / uniqueDays.length : (dailyQuota || 1);
+    const avgDaily = uniqueDays.length > 0 ? totalSpentAllTime / uniqueDays.length : (dailyAverage || 1);
     const survivalDays = avgDaily > 0 ? state.balance / avgDaily : 0;
 
-    return { todaySpent, dailyBudget: dailyQuota, safeSpendToday, daysLeft, survivalDays, transactionCount, biggestExpense };
+    return { todaySpent, dailyBudget: dailyAverage, safeSpendToday, daysLeft, survivalDays, transactionCount, biggestExpense };
 };
 
 const updateDashboard = () => {
@@ -109,12 +121,19 @@ const updateDashboard = () => {
     
     if (dailyBudgetEl) dailyBudgetEl.textContent = formatCurrency(dailyBudget);
 
-    // Color Coding Logic
+    // Color & Text Logic
     if (safeSpendToday < 0) {
         safeSpendEl.textContent = `₹${Math.abs(Math.round(safeSpendToday))}`;
         safeSpendEl.className = 'text-6xl font-mono font-bold text-pd-red';
         if (labelEl) {
-            labelEl.textContent = `⚠ Overspent by ${formatCurrency(Math.abs(safeSpendToday))} today`;
+            labelEl.textContent = `Overspent by ${formatCurrency(Math.abs(safeSpendToday))} today`;
+            labelEl.className = 'text-[10px] font-black text-pd-red tracking-[0.2em] uppercase text-center transition-all mb-1';
+        }
+    } else if (safeSpendToday === 0) {
+        safeSpendEl.textContent = "₹0";
+        safeSpendEl.className = 'text-6xl font-mono font-bold text-pd-red'; // Budget reached = red
+        if (labelEl) {
+            labelEl.textContent = "Daily budget reached";
             labelEl.className = 'text-[10px] font-black text-pd-red tracking-[0.2em] uppercase text-center transition-all mb-1';
         }
     } else {
@@ -171,10 +190,11 @@ const updateDashboard = () => {
         percentEl.textContent = `${Math.round(ratio)}%`;
     }
 
-    // Status Footer Warning Logic
+    // Status Footer Warning Logic (Broke Mode)
     const warningEl = document.getElementById('footer-warning');
+    const brokeMsgEl = document.getElementById('broke-message');
 
-    if (safeSpendToday < 0 || dailyBudget < 50) {
+    if (safeSpendToday < 0) {
         if (!state.warningDismissed && warningEl) {
             warningEl.classList.remove('hidden');
             
@@ -182,13 +202,22 @@ const updateDashboard = () => {
             const overspentAmt = Math.abs(Math.round(safeSpendToday));
             const titleEl = warningEl.querySelector('p.font-black');
             if (titleEl) {
-                titleEl.textContent = safeSpendToday < 0 ? `Overspent by ${formatCurrency(overspentAmt)}` : `Low Daily Quota`;
+                titleEl.textContent = `Broke Mode Active • Overspent ₹${overspentAmt}`;
+            }
+
+            // Randomize message if just shown
+            if (brokeMsgEl && brokeMsgEl.textContent === "") {
+                const msg = SURVIVAL_MESSAGES[Math.floor(Math.random() * SURVIVAL_MESSAGES.length)];
+                brokeMsgEl.textContent = msg;
             }
         } else if (warningEl) {
             warningEl.classList.add('hidden');
         }
     } else {
-        if (warningEl) warningEl.classList.add('hidden');
+        if (warningEl) {
+            warningEl.classList.add('hidden');
+            if (brokeMsgEl) brokeMsgEl.textContent = ""; // Reset for next time
+        }
     }
 
     // --- WEEKLY HEATMAP ---
@@ -220,71 +249,48 @@ const updateDashboard = () => {
     } else {
         badgesContainer.classList.add('hidden');
     }
-
-    // Check Achievements (Survive with > 500 etc)
-    const newAchievements = checkAchievements({ balance: state.balance, daysRemaining: getDaysRemaining() }, state.achievements);
-    if (newAchievements.length > 0) {
-        newAchievements.forEach(ach => {
-            state.achievements.push(ach);
-            showAchievementPopup(ach);
-            if (state.user) saveAchievements(state.user.uid, state.achievements);
-        });
-    }
 };
 
-const renderExpenses = () => {
+const renderTodayExpenses = () => {
     const listEl = document.getElementById('expense-list');
     if (!listEl) return;
 
-    if (state.expenses.length === 0) {
+    const todayDate = getTodayStr();
+    const todayExpenses = state.expenses.filter(e => e.date === todayDate);
+
+    if (todayExpenses.length === 0) {
         listEl.innerHTML = `
             <div class="text-center py-12 opacity-20 italic text-sm border border-dashed border-white/10 rounded-2xl">
-                No expenses logged yet.
+                No activity today.
             </div>
         `;
         return;
     }
 
-    // Sort expenses by ID (timestamp) descending
-    const sortedExpenses = [...state.expenses].sort((a, b) => b.id - a.id);
+    // Sort by timestamp descending
+    const sorted = [...todayExpenses].sort((a, b) => b.id - a.id);
     
-    // Group by date
-    const groups = {};
-    sortedExpenses.forEach(exp => {
-        if (!groups[exp.date]) groups[exp.date] = [];
-        groups[exp.date].push(exp);
-    });
-
-    const todayDate = getTodayStr();
-
-    listEl.innerHTML = Object.entries(groups).map(([date, items]) => {
-        const isToday = date === todayDate;
-        const dateObj = new Date(date + 'T00:00:00'); // Ensure local time
-        const dateLabel = isToday ? 'Today' : dateObj.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-        
-        return `
-            <div class="mb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                <h4 class="text-[9px] font-black opacity-30 uppercase tracking-[0.2em] mb-3 px-1">${dateLabel}</h4>
-                <div class="flex flex-col gap-2">
-                    ${items.map(exp => `
-                        <div class="bg-white/5 p-4 rounded-2xl border border-white/5 flex justify-between items-center group active:scale-[0.98] transition-all">
-                            <div class="flex items-center gap-3">
-                                <span class="text-xl shrink-0">${getEmoji(exp.category)}</span>
-                                <div class="overflow-hidden">
-                                    <span class="block font-bold text-sm text-white truncate w-full max-w-[180px]">${exp.title || exp.category}</span>
-                                    <span class="text-[9px] opacity-40 uppercase font-black tracking-tighter">${new Date(exp.id).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-4">
-                                <span class="font-mono font-bold text-pd-red">-${formatCurrency(exp.amount)}</span>
-                                <button onclick="deleteExpense(${exp.id}, '${exp.firestoreId || ''}')" class="opacity-20 hover:opacity-100 p-2 -mr-2 text-pd-red transition-all">✕</button>
+    listEl.innerHTML = `
+        <div class="animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div class="flex flex-col gap-2">
+                ${sorted.map(exp => `
+                    <div class="bg-white/5 p-4 rounded-2xl border border-white/5 flex justify-between items-center group active:scale-[0.98] transition-all">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xl shrink-0">${getEmoji(exp.category)}</span>
+                            <div class="overflow-hidden">
+                                <span class="block font-bold text-sm text-white truncate w-full max-w-[180px]">${exp.title || exp.category}</span>
+                                <span class="text-[9px] opacity-40 uppercase font-black tracking-tighter">${new Date(exp.id).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                             </div>
                         </div>
-                    `).join('')}
-                </div>
+                        <div class="flex items-center gap-4">
+                            <span class="font-mono font-bold text-pd-red">-${formatCurrency(exp.amount)}</span>
+                            <button onclick="deleteExpense(${exp.id}, '${exp.firestoreId || ''}')" class="opacity-20 hover:opacity-100 p-2 -mr-2 text-pd-red transition-all">✕</button>
+                        </div>
+                    </div>
+                `).join('')}
             </div>
-        `;
-    }).join('');
+        </div>
+    `;
 };
 
 const getEmoji = (cat) => {
@@ -393,7 +399,7 @@ window.addExpense = async (amount, category, title = '') => {
     state.balance -= expense.amount;
     state.warningDismissed = false; // Reset dismissal on new expense
     updateDashboard();
-    renderExpenses();
+    renderTodayExpenses();
 
     if (state.user) {
         try {
@@ -421,7 +427,7 @@ window.deleteExpense = async (id, firestoreId) => {
     // UI update
     state.warningDismissed = false; // Reset on delete too
     updateDashboard();
-    renderExpenses();
+    renderTodayExpenses();
 
     if (state.user) {
         try {
@@ -464,17 +470,15 @@ const initApp = () => {
                     state.targetDate = cloudUser.targetDate ?? state.targetDate;
                 }
 
-                // Load achievements from cloud if available
-                state.achievements = await loadAchievements(state.user.uid);
-                
-                const cloudExpenses = await fetchExpensesFromFirestore(user.uid);
-                
-                // Merge Logic: If we have local expenses that aren't in the cloud yet, keep them.
-                // But for a simple '1.0' experience, cloud is usually source of truth once logged in.
-                if (cloudExpenses.length > 0) {
-                    state.expenses = cloudExpenses;
-                    saveExpenses(); // Sync local storage with latest cloud
-                }
+                // Real-time listener for Expenses - Ensuring Today's Activity Persists
+                listenToExpenses(user.uid, (updatedExpenses) => {
+                    if (updatedExpenses.length > 0 || state.expenses.length > 0) {
+                        state.expenses = updatedExpenses;
+                        saveExpenses(); // Sync local storage with latest cloud
+                        updateDashboard();
+                        renderTodayExpenses();
+                    }
+                });
                 
                 // AUTOMATIC SETUP: If logged in but no balance/date set in cloud or local
                 if (!state.balance && !state.targetDate) {
@@ -483,8 +487,6 @@ const initApp = () => {
             } catch (e) {
                 console.error("Initial cloud sync failed, using local fallback", e);
             }
-            updateDashboard();
-            renderExpenses();
         } else {
             state.user = null;
             landingEl?.classList.remove('hidden');
@@ -516,7 +518,37 @@ const initApp = () => {
             state.targetDate = localStorage.getItem('pocketday_target_date') || '';
         }
         updateDashboard();
-        renderExpenses();
+        renderTodayExpenses();
+    });
+
+    // Profile Dropdown Logic
+    const avatarBtn = document.getElementById('btn-avatar');
+    const dropdown = document.getElementById('profile-dropdown');
+
+    const toggleDropdown = (show) => {
+        if (!dropdown) return;
+        console.log("Toggling dropdown:", show);
+        if (show) {
+            dropdown.classList.remove('scale-95', 'opacity-0', 'pointer-events-none');
+            dropdown.classList.add('scale-100', 'opacity-100');
+        } else {
+            dropdown.classList.remove('scale-100', 'opacity-100');
+            dropdown.classList.add('scale-95', 'opacity-0', 'pointer-events-none');
+        }
+    };
+
+    if (avatarBtn) {
+        avatarBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = dropdown.classList.contains('opacity-100');
+            toggleDropdown(!isOpen);
+        });
+    }
+
+    document.addEventListener('click', (e) => {
+        if (dropdown && !dropdown.contains(e.target) && !avatarBtn.contains(e.target)) {
+            toggleDropdown(false);
+        }
     });
 
     // Login Action (Landing Page)
@@ -530,6 +562,12 @@ const initApp = () => {
 
     // Logout Action
     document.getElementById('btn-logout').addEventListener('click', () => {
+        const dropdown = document.getElementById('profile-dropdown');
+        if (dropdown) {
+            dropdown.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+            dropdown.classList.remove('opacity-100', 'scale-100');
+        }
+        
         if (confirm("Logout? Data will sync next time you login.")) {
             logout();
         }
@@ -556,13 +594,14 @@ const initApp = () => {
         }
     });
 
-    // Set up Quick Action (Custom)
-    const customBtn = document.getElementById('btn-custom');
-    if (customBtn) {
-        customBtn.addEventListener('click', () => {
-            openExpenseModal();
+    // Set up Quick Actions
+    document.querySelectorAll('#quick-actions button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const cat = btn.dataset.category || '';
+            const amt = btn.dataset.amount || '';
+            openExpenseModal(amt, cat);
         });
-    }
+    });
 
     // FAB Custom Add
     const fab = document.getElementById('fab-add-expense');
